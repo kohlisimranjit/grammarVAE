@@ -7,6 +7,8 @@ import models.model_zinc_str
 from six.moves import xrange
 import re
 
+ENABLE_SAMPLING = False
+
 def get_zinc_tokenizer(cfg):
     long_tokens = filter(lambda a: len(a) > 1, cfg._lexical_index.keys())
     replacements = ['$','%','^'] # ,'&']
@@ -101,8 +103,12 @@ class ZincGrammarModel(object):
         for t in xrange(unmasked.shape[1]):
             next_nonterminal = [self._lhs_map[pop_or_nothing(a)] for a in S]
             mask = self._grammar.masks[next_nonterminal]
-            masked_output = np.exp(unmasked[:,t,:])*mask + eps
-            sampled_output = np.argmax(np.random.gumbel(size=masked_output.shape) + np.log(masked_output), axis=-1)
+            if ENABLE_SAMPLING:
+                masked_output = np.exp(unmasked[:,t,:])*mask + eps
+                sampled_output = np.argmax(np.random.gumbel(size=masked_output.shape) + np.log(masked_output), axis=-1)
+            else:
+                masked_output = np.exp(unmasked[:,t,:])*mask
+                sampled_output = np.argmax(masked_output, axis=-1)
             X_hat[np.arange(unmasked.shape[0]),t,sampled_output] = 1.0
 
             # Identify non-terminals in RHS of selected production, and
