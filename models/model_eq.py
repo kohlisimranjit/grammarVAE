@@ -16,7 +16,7 @@ ind_of_ind_K = K.variable(G.ind_of_ind)
 
 MAX_LEN = 15
 DIM = G.D
-
+VAE_MODE = False
 
 class MoleculeVAE():
 
@@ -111,7 +111,9 @@ class MoleculeVAE():
             return z_mean_ + K.exp(z_log_var_ / 2) * epsilon
 
         z_mean = Dense(latent_rep_size, name='z_mean', activation = 'linear')(h)
-        z_log_var = Dense(latent_rep_size, name='z_log_var', activation = 'linear')(h)
+        z_log_var = None
+        if VAE_MODE:
+            z_log_var = Dense(latent_rep_size, name='z_log_var', activation = 'linear')(h)
 
         def conditional(x_true, x_pred):
             most_likely = K.argmax(x_true)
@@ -131,10 +133,17 @@ class MoleculeVAE():
             x = K.flatten(x)
             x_decoded_mean = K.flatten(x_decoded_mean)
             xent_loss = max_length * objectives.binary_crossentropy(x, x_decoded_mean)
-            kl_loss = - 0.5 * K.mean(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var), axis = -1)
-            return xent_loss + kl_loss
+            kl_loss = 0
+            if VAE_MODE:
+                kl_loss = - 0.5 * K.mean(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var), axis = -1)
+                return xent_loss + kl_loss
+            else:
+                return xent_loss
 
-        return (vae_loss, Lambda(sampling, output_shape=(latent_rep_size,), name='lambda')([z_mean, z_log_var]))
+        if VAE_MODE:
+            return (vae_loss, Lambda(sampling, output_shape=(latent_rep_size,), name='lambda')([z_mean, z_log_var]))
+        else: 
+            return (vae_loss, z_mean)
 
     def _buildDecoder(self, z, latent_rep_size, max_length, charset_length):
         h = BatchNormalization(name='batch_4')(z)
